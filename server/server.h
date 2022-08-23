@@ -18,7 +18,7 @@
 typedef struct server_data
 {
     int sockets_count;
-    int **sockets_arr;
+    int *sockets_arr;
 
 }Server;
 

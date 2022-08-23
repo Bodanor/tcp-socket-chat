@@ -18,7 +18,6 @@ int main(int argc, char **argv)
     ClientArgs *client_args = NULL;
     Server *server_data = NULL;
     pthread_t sniffer_thread;
-    int client_count = 0;
 
     socket_desc = socket(AF_INET, SOCK_STREAM, 0);
     if (socket_desc == -1){
@@ -70,10 +69,8 @@ int main(int argc, char **argv)
             }
             client_args->client = client;
             client_args->client_socket = client_socket;
-            server_data->sockets_count++;
-            (server_data->sockets_arr)[0][client_count] = client_socket;
+            server_data->sockets_arr[server_data->sockets_count++] = client_socket;
             client_args->server_data = server_data;
-            client_count++;
 
 
             if (pthread_create(&sniffer_thread, NULL, connexion_handler,(void *)client_args) < 0){
