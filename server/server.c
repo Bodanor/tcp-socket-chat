@@ -15,16 +15,16 @@ void *connexion_handler (void *arguments)
             bytes_rcv = -1;
         }
         else{
-            bytes_rcv = recv(client_args->client_socket, buffer, BUFFERSIZE, 0);
+            bytes_rcv = recv(client_args->client_socket, buffer, BUFFERSIZE - 1, 0);
             if (bytes_rcv == 0){
-                printf("Client disconnected !\n");
-                socket_disconnect_handler(client_args->client_socket, client_args->server_data);
+                printf("Client from : %s on port -> %d disconnected !\n", inet_ntoa(client_args->client.sin_addr), ntohs(client_args->client.sin_port));
+                socket_disconnect_handler(client_args);
                 client_args->server_data->sockets_count--;
                 bytes_send = 0;
             }
             else if (bytes_rcv == -1){
-                printf("Pipe broken for client !\n");
-                socket_disconnect_handler(client_args->client_socket, client_args->server_data);
+                printf("Pipe broken for : %s on port -> %d disconnected !\n", inet_ntoa(client_args->client.sin_addr), ntohs(client_args->client.sin_port));
+                socket_disconnect_handler(client_args);
                 client_args->server_data->sockets_count--;
                 bytes_send = 0;
             }
@@ -34,10 +34,14 @@ void *connexion_handler (void *arguments)
                     for (i = 0; i < client_args->server_data->sockets_count; i++){
                         if (client_args->client_socket != client_args->server_data->sockets_arr[i]){
                             bytes_send = send(client_args->server_data->sockets_arr[i], buffer, strlen(buffer) + 1, 0);
-                            if (bytes_send < 1)
+                            if (bytes_send < 1){
                                 printf("Could not send message back !\n");
-                            else if (bytes_send != strlen(buffer)+1)
+                                socket_disconnect_handler(client_args);
+                            }
+                            else if (bytes_send != strlen(buffer)+1){
                                 printf("Data corrupted !\n");
+                                socket_disconnect_handler(client_args);
+                            }
                         }
                     }
                 }
@@ -47,14 +51,13 @@ void *connexion_handler (void *arguments)
         }
     }while (bytes_rcv > 0 || bytes_send > 0);
 
-    printf("closing !\n");
     close(client_args->client_socket);
     free(client_args);
 
     return 0;
 }
 
-Server *InitServ(void)
+Server *InitServ(int max_client)
 {
     Server *server_data = (Server*)malloc(sizeof(Server));
     if (server_data == NULL){
@@ -62,7 +65,7 @@ Server *InitServ(void)
         return NULL;
     }
     server_data->sockets_count = 0;
-    server_data->sockets_arr = (int*)malloc(sizeof(int));
+    server_data->sockets_arr = (int*)malloc(sizeof(int)*max_client);
     if (server_data->sockets_arr == NULL){
         printf("Fatal malloc error for sockets_arrays !\n");
         return NULL;
@@ -71,23 +74,22 @@ Server *InitServ(void)
     return server_data;
 }
 
-void socket_disconnect_handler(int socket_num, Server *server_data)
+void socket_disconnect_handler(ClientArgs *clientargs)
 {
-    assert(socket_num >= 0);
-    assert(server_data->sockets_arr != NULL);
+    assert(clientargs != NULL);
     int i;
 
     /*
         Find not valid socket in list
     */
 
-    for (i = 0; i < server_data->sockets_count && server_data->sockets_arr[i] != socket_num ; i++)
+    for (i = 0; i < clientargs->server_data->sockets_count && clientargs->server_data->sockets_arr[i] != clientargs->client_socket ; i++)
         ;
     
-    for (; i < server_data->sockets_count; i++){
-        if ((i + 1) < server_data->sockets_count)
-            server_data->sockets_arr[i] = server_data->sockets_arr[i + 1];
-            
+    for (; i < clientargs->server_data->sockets_count; i++){
+        if ((i + 1) < clientargs->server_data->sockets_count)
+            clientargs->server_data->sockets_arr[i] = clientargs->server_data->sockets_arr[i + 1];
     }
+
 
 }

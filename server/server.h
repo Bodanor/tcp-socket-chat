@@ -31,7 +31,7 @@ typedef struct arg_handler
 }ClientArgs;
 
 void *connexion_handler (void *arguments);
-Server *InitServ(void);
-void socket_disconnect_handler(int socket_num, Server *server_data);
+Server *InitServ(int max_clients);
+void socket_disconnect_handler(ClientArgs *clientargs);
 
 #endif

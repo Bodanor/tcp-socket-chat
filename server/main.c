@@ -38,7 +38,7 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    server_data = InitServ();
+    server_data = InitServ(100);
     if (server_data == NULL){
         printf("Memory error !\n");
         return -1;
