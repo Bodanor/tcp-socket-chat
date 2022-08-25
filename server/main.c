@@ -62,7 +62,7 @@ int main(int argc, char **argv)
         if (client_socket < 0)
             printf("Accept Failed !\n");
         else{
-            printf("New connection from : %s on port -> %d\n", inet_ntoa(client.sin_addr), ntohs(client.sin_port));
+            printf("[+] New connection from : %s on port -> %d\n", inet_ntoa(client.sin_addr), ntohs(client.sin_port));
             client_data = add_client(&server_data, client, client_socket);
             if (pthread_create(&sniffer_thread, NULL, connexion_handler,(void *)client_data) < 0){
                 printf("Could not create thread !\n");
