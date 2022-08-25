@@ -88,9 +88,24 @@ void *connexion_handler(void *client_data)
     char buffer[BUFFERSIZE];
     int bytes_received;
 
-    while((bytes_received = recv(client->client_socket_num, buffer, BUFFERSIZE -1, 0)) > 0)
-        ;
-    
+    while (1)
+    {
+        if(send(client->client_socket_num, "chris", strlen("chris"), 0) == -1)
+            printf("error");
+    }
+    while((bytes_received = recv(client->client_socket_num, buffer, BUFFERSIZE -1, 0)) > 0){
+        if (buffer[0] != '\n'){
+            printf("[!] Received %d bytes from : %s on port -> %d !\n", bytes_received, inet_ntoa(client->client_socket.sin_addr), ntohs(client->client_socket.sin_port));
+        }
+        if (send(client->client_socket_num, buffer, bytes_received, 0) != bytes_received)
+            printf("[X] Broadcast corrupted for : %s on port -> %d !\n", inet_ntoa(client->client_socket.sin_addr), ntohs(client->client_socket.sin_port));
+    }
+    if (bytes_received == 0){
+        printf("[-] Client from : %s on port -> %d disconnected !\n", inet_ntoa(client->client_socket.sin_addr), ntohs(client->client_socket.sin_port));
+    }
+    else if (bytes_received == -1){
+        printf("[-] Pipe broken for client from : %s on port -> %d !\n", inet_ntoa(client->client_socket.sin_addr), ntohs(client->client_socket.sin_port));
+    }
     remove_client(&client->server_data, client);
 
    return 0;
