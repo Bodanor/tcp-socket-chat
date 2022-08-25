@@ -8,7 +8,7 @@ def spam(socket):
     while 1:
         socket.send(b"Spamming")
 
-for i in range (0, 100):
+for i in range (0, 1000):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.connect(("127.0.0.1", 9999))
     x = threading.Thread(target=spam, args=(s,))
