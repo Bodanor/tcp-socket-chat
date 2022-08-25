@@ -15,23 +15,35 @@
 
 #define BUFFERSIZE 255
 
-typedef struct server_data
-{
-    int sockets_count;
-    int *sockets_arr;
+typedef struct client_t Client;
+typedef struct client_node_t ClientNode;
+typedef struct server_t Server;
 
-}Server;
+struct client_t{
 
-typedef struct arg_handler
-{
-    int client_socket;
-    struct sockaddr_in client;
+    struct sockaddr_in client_socket;
+    int client_socket_num;
     Server *server_data;
+    
+};
 
-}ClientArgs;
+struct client_node_t{
 
-void *connexion_handler (void *arguments);
-Server *InitServ(int max_clients);
-void socket_disconnect_handler(ClientArgs *clientargs);
+    Client *client;
+    ClientNode *next_client;
 
+};
+
+
+struct server_t{
+
+    ClientNode *node;
+    int clients_count;
+};
+
+
+Server *init_Server(void);
+Client *add_client(Server **server_data, struct sockaddr_in client_socket, int client_socket_num);
+void remove_client(Server **server_data, Client *client);
+void *connexion_handler(void *clients);
 #endif

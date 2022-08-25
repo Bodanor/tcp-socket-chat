@@ -1,95 +1,98 @@
 #include "server.h"
 
-void *connexion_handler (void *arguments)
+pthread_mutex_t mutex;
+
+Server *init_Server(void)
 {
-    ClientArgs *client_args = (ClientArgs*)arguments;
-    int bytes_rcv, bytes_send, i;
-    char *buffer = NULL;
+    Server *serv = (Server*)malloc(sizeof(Server));
+    if (serv == NULL)
+        return NULL;
+    
+    serv->clients_count = 0;
+    serv->node = NULL;
 
-    bytes_rcv = bytes_send = 0;
-
-    do{
-        buffer = (char*)malloc(sizeof(char)*BUFFERSIZE);
-        if (buffer == NULL){
-            printf("Fatal malloc error on buffer !\n");
-            bytes_rcv = -1;
-        }
-        else{
-            bytes_rcv = recv(client_args->client_socket, buffer, BUFFERSIZE - 1, 0);
-            if (bytes_rcv == 0){
-                printf("Client from : %s on port -> %d disconnected !\n", inet_ntoa(client_args->client.sin_addr), ntohs(client_args->client.sin_port));
-                socket_disconnect_handler(client_args);
-                client_args->server_data->sockets_count--;
-                bytes_send = 0;
-            }
-            else if (bytes_rcv == -1){
-                printf("Pipe broken for : %s on port -> %d disconnected !\n", inet_ntoa(client_args->client.sin_addr), ntohs(client_args->client.sin_port));
-                socket_disconnect_handler(client_args);
-                client_args->server_data->sockets_count--;
-                bytes_send = 0;
-            }
-            else{
-                buffer[bytes_rcv] = '\0';
-                if (buffer[0] != '\n'){
-                    for (i = 0; i < client_args->server_data->sockets_count; i++){
-                        if (client_args->client_socket != client_args->server_data->sockets_arr[i]){
-                            bytes_send = send(client_args->server_data->sockets_arr[i], buffer, strlen(buffer) + 1, 0);
-                            if (bytes_send < 1){
-                                printf("Could not send message back !\n");
-                                socket_disconnect_handler(client_args);
-                            }
-                            else if (bytes_send != strlen(buffer)+1){
-                                printf("Data corrupted !\n");
-                                socket_disconnect_handler(client_args);
-                            }
-                        }
-                    }
-                }
-            }
-            free(buffer);
-
-        }
-    }while (bytes_rcv > 0 || bytes_send > 0);
-
-    close(client_args->client_socket);
-    free(client_args);
-
-    return 0;
+    pthread_mutex_init(&mutex, NULL);
+    return serv;
 }
 
-Server *InitServ(int max_client)
+
+Client *add_client(Server **server_data, struct sockaddr_in client_socket, int client_socket_num)
 {
-    Server *server_data = (Server*)malloc(sizeof(Server));
-    if (server_data == NULL){
-        printf("Fatal Malloc error !\n");
+    ClientNode *tmp;
+    Client *curr_client;
+    ClientNode *next_node;
+
+
+    curr_client = (Client*)malloc(sizeof(Client));
+    if (curr_client == NULL)
         return NULL;
-    }
-    server_data->sockets_count = 0;
-    server_data->sockets_arr = (int*)malloc(sizeof(int)*max_client);
-    if (server_data->sockets_arr == NULL){
-        printf("Fatal malloc error for sockets_arrays !\n");
-        return NULL;
+
+    else{
+        curr_client->client_socket = client_socket;
+        curr_client->client_socket_num = client_socket_num;
+        curr_client->server_data = *server_data;
     }
 
-    return server_data;
+    next_node = (ClientNode*)malloc(sizeof(ClientNode));
+    if (next_node == NULL)
+        return NULL;
+    else{
+        next_node->client = curr_client;
+        next_node->next_client = NULL;
+    }
+    pthread_mutex_lock(&mutex);
+    tmp = (*server_data)->node;
+    if (tmp == NULL)
+        (*server_data)->node = next_node;
+
+    else{
+        while (tmp->next_client != NULL)
+            tmp = tmp->next_client;
+
+        tmp->next_client = next_node;
+    }
+
+    (*server_data)->clients_count++;
+    pthread_mutex_unlock(&mutex);
+    return curr_client;
 }
 
-void socket_disconnect_handler(ClientArgs *clientargs)
+void remove_client(Server **server_data, Client *client)
 {
-    assert(clientargs != NULL);
-    int i;
+    ClientNode *node_ptr = NULL;
+    ClientNode *node_prec = NULL;
 
-    /*
-        Find not valid socket in list
-    */
+    pthread_mutex_lock(&mutex);
+    node_ptr = (*server_data)->node;
 
-    for (i = 0; i < clientargs->server_data->sockets_count && clientargs->server_data->sockets_arr[i] != clientargs->client_socket ; i++)
+    if (node_ptr != NULL){
+        while (node_ptr->next_client != NULL && node_ptr->client->client_socket_num != client->client_socket_num){
+            node_prec = node_ptr;
+            node_ptr = node_ptr->next_client;
+        }
+        
+        if (node_ptr->next_client != NULL && node_prec != NULL){
+            close(node_ptr->client->client_socket_num);
+            node_prec->next_client = node_ptr->next_client;
+        }
+        else
+            (*server_data)->node = (*server_data)->node->next_client;
+    }
+    (*server_data)->clients_count--;
+    pthread_mutex_unlock(&mutex);
+}
+
+void *connexion_handler(void *client_data)
+{
+    Client *client = (Client*)client_data;
+    char buffer[BUFFERSIZE];
+    int bytes_received;
+
+    while((bytes_received = recv(client->client_socket_num, buffer, BUFFERSIZE -1, 0)) > 0)
         ;
     
-    for (; i < clientargs->server_data->sockets_count; i++){
-        if ((i + 1) < clientargs->server_data->sockets_count)
-            clientargs->server_data->sockets_arr[i] = clientargs->server_data->sockets_arr[i + 1];
-    }
+    remove_client(&client->server_data, client);
 
+   return 0;
 
 }

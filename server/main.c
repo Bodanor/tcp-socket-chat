@@ -8,16 +8,21 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+#include <signal.h>
 
 #include "server.h"
 
+extern pthread_mutex_t mutex;
 int main(int argc, char **argv)
 {
+    signal(SIGPIPE, SIG_IGN);
+
     int socket_desc, client_socket, c;
     struct sockaddr_in server, client;
-    ClientArgs *client_args = NULL;
-    Server *server_data = NULL;
     pthread_t sniffer_thread;
+
+    Client *client_data = NULL;
+    Server *server_data = NULL;
 
     socket_desc = socket(AF_INET, SOCK_STREAM, 0);
     if (socket_desc == -1){
@@ -27,6 +32,7 @@ int main(int argc, char **argv)
     server.sin_family = AF_INET;
     server.sin_addr.s_addr = INADDR_ANY;
     server.sin_port = htons(9999);
+
 
     if (setsockopt(socket_desc, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int)) < 0){
         printf("Error setsockopt !\n");
@@ -38,9 +44,9 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    server_data = InitServ(100);
+    server_data = init_Server();
     if (server_data == NULL){
-        printf("Memory error !\n");
+        printf("Malloc error on server struct !\n");
         return -1;
     }
 
@@ -57,23 +63,8 @@ int main(int argc, char **argv)
             printf("Accept Failed !\n");
         else{
             printf("New connection from : %s on port -> %d\n", inet_ntoa(client.sin_addr), ntohs(client.sin_port));
-            client_args = (ClientArgs*)malloc(sizeof(ClientArgs));
-            if (client_args == NULL){
-                printf("Fatal malloc error for client args !\n");
-                return -1;
-            }
-            client_args->server_data = (Server*)malloc(sizeof(Server));
-            if (client_args->server_data == NULL){
-                printf("Fatal malloc error for server_data over client handler !\n");
-                return -1;
-            }
-            client_args->client = client;
-            client_args->client_socket = client_socket;
-            server_data->sockets_arr[server_data->sockets_count++] = client_socket;
-            client_args->server_data = server_data;
-
-
-            if (pthread_create(&sniffer_thread, NULL, connexion_handler,(void *)client_args) < 0){
+            client_data = add_client(&server_data, client, client_socket);
+            if (pthread_create(&sniffer_thread, NULL, connexion_handler,(void *)client_data) < 0){
                 printf("Could not create thread !\n");
                 return -1;
             }
