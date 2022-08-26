@@ -1,6 +1,24 @@
 #include "server.h"
 
-pthread_mutex_t mutex;
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
+static void broadcast_data(Client *client, char *buffer, int bytes_recv)
+{
+    ClientNode *client_ptr = client->server_data->node;
+    int bytes_send;
+
+    while (client_ptr != NULL){
+        if (client_ptr->client->client_socket_num != client->client_socket_num){
+            if ((bytes_send = send(client_ptr->client->client_socket_num, buffer, bytes_recv, 0)) == -1){
+                printf("[-] Pipe broken for : %s on port -> %d !\n", inet_ntoa(client_ptr->client->client_socket.sin_addr), ntohs(client_ptr->client->client_socket.sin_port));
+            }
+            else if (bytes_send != bytes_recv){
+                printf("[X] Broadcast corrupted for : %s on port -> %d !\n", inet_ntoa(client_ptr->client->client_socket.sin_addr), ntohs(client_ptr->client->client_socket.sin_port));
+            }
+    }
+    client_ptr = client_ptr->next_client;
+   }
+}
 
 Server *init_Server(void)
 {
@@ -32,7 +50,6 @@ Client *add_client(Server **server_data, struct sockaddr_in client_socket, int c
         curr_client->client_socket_num = client_socket_num;
         curr_client->server_data = *server_data;
     }
-
     next_node = (ClientNode*)malloc(sizeof(ClientNode));
     if (next_node == NULL)
         return NULL;
@@ -71,7 +88,7 @@ void remove_client(Server **server_data, Client *client)
             node_ptr = node_ptr->next_client;
         }
         
-        if (node_ptr->next_client != NULL && node_prec != NULL){
+        if (node_prec != NULL){
             close(node_ptr->client->client_socket_num);
             node_prec->next_client = node_ptr->next_client;
         }
@@ -89,11 +106,12 @@ void *connexion_handler(void *client_data)
     int bytes_received;
 
     while((bytes_received = recv(client->client_socket_num, buffer, BUFFERSIZE -1, 0)) > 0){
+
         if (buffer[0] != '\n'){
-            printf("[!] Received %d bytes from : %s on port -> %d !\n", bytes_received, inet_ntoa(client->client_socket.sin_addr), ntohs(client->client_socket.sin_port));
+            //printf("[!] Received %d bytes from : %s on port -> %d !\n", bytes_received, inet_ntoa(client->client_socket.sin_addr), ntohs(client->client_socket.sin_port));
             
-            if (send(client->client_socket_num, buffer, bytes_received, 0) != bytes_received)
-                printf("[X] Broadcast corrupted for : %s on port -> %d !\n", inet_ntoa(client->client_socket.sin_addr), ntohs(client->client_socket.sin_port));
+            broadcast_data(client, buffer, bytes_received);
+
         }
     }
     if (bytes_received == 0){

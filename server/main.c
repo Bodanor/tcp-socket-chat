@@ -9,6 +9,7 @@
 #include <string.h>
 #include <errno.h>
 #include <signal.h>
+#include <fcntl.h>
 
 #include "server.h"
 
@@ -57,6 +58,7 @@ int main(int argc, char **argv)
         c = sizeof(struct sockaddr_in);
         do{
             client_socket = accept(socket_desc, (struct sockaddr*)&client, (socklen_t*)&c);
+            
         }while(client_socket < 0);
 
         if (client_socket < 0)
